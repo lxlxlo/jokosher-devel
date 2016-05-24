@@ -1,0 +1,11 @@
+Metadata-Version: 1.0
+Name: jokosher
+Version: 0.11.5
+Summary: Multi-track non-linear audio editing.
+Home-page: http://www.jokosher.org/
+Author: Jokosher Project
+Author-email: jokosher-devel-list@gnome.org
+License: GNU GPL
+Download-URL: http://www.jokosher.org/download
+Description: Jokosher is a simple yet powerful multi-track studio. With it you can create and record music, podcasts and more, all from an integrated simple environment.
+Platform: linux

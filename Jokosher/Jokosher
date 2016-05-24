@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+#
+#	THIS FILE IS PART OF THE JOKOSHER PROJECT AND LICENSED UNDER THE GPL. SEE
+#	THE 'COPYING' FILE FOR DETAILS
+#	
+#	This script tries to launch Jokosher from the current directory,
+#	and is also responsible for parsing comment line arguments.
+#
+#-------------------------------------------------------------------------------
+import os, sys
+
+def localFileImport(importName):
+	"""
+	Checks to see if the file exists before importing it
+	to avoid weird errors which come up that have nothing
+	to do with importing. importName should be a string of
+	the file name without the ".py" on the end.
+	"""
+	# Import from current directory if file exists
+	# (replaces previous method of trapping import which used to
+	# leave confusing error messages if a module was missing)
+	ourpath = os.path.dirname(os.path.abspath(__file__))
+	if os.path.exists(os.path.join(ourpath, importName + ".py")):
+		try:
+			#this is equivalent to "import Globals", but with a variable in
+			#place of "Globals"
+			module = __import__(importName)
+			globals()[importName] = module
+			sys.modules["Jokosher." + importName] = module
+		
+		except Exception, e:
+			print "Error loading Jokosher: %s" % e
+			sys.exit()
+		else:
+			#remove the last dir so ourpath is like .../jokosher/JonoEdit/trunk/
+			ourpath = os.path.split(ourpath)[0]
+			if not ourpath in sys.path:
+				#make sure Jokosher.Extension is in the python path, so extensions can import it.
+				#ourpath is something like .../jokosher/JonoEdit/trunk/Jokosher
+				sys.path.insert(0, ourpath)
+	else:
+		print "Cannot find local file %s.py." % importName
+		sys.exit()
+
+#try a local "import Globals", and then try to find it in the python path
+localFileImport("Globals")
+#for parsing out command line arguments
+import optparse
+#for i18n "--help" message
+import locale, gettext
+_ = gettext.gettext
+
+# enable path to dump dot files
+# this *must* be done before 'import gst' because it reads the env var on startup.
+os.environ.setdefault("GST_DEBUG_DUMP_DOT_DIR", Globals.JOKOSHER_DATA_HOME)
+
+try:
+	locale.setlocale(locale.LC_ALL, '')
+	gettext.bindtextdomain(Globals.LOCALE_APP, Globals.LOCALE_PATH)
+	gettext.bind_textdomain_codeset(Globals.LOCALE_APP, "UTF-8")
+	gettext.textdomain(Globals.LOCALE_APP)
+	gettext.install(Globals.LOCALE_APP)
+except locale.Error:
+	print "Locale unsupported, defaulting to english for all Jokosher specific text."
+	
+# parse command line
+openproject = None
+loadExtensions = True
+
+parser = optparse.OptionParser(usage="%prog [options] [project-file]", version="0.11.5")
+#command line options
+parser.add_option("-d", "--debug", action="store_true", dest="debug", 
+				help=_("Print debug output to stdout"))
+parser.add_option("-g", "--gst-debug", action="store_true", dest="gstDebug", 
+				help=_("Sent debug output to Gstreamer's debug system"))
+parser.add_option("-s", "--safe-mode", action="store_true", dest="safeMode", 
+				help=_("Don't load extensions or last project on startup (same as -ne)"))
+parser.add_option("-w", "--welcome-dialog", action="store_true", dest="forceWelcome", 
+				help=_("Force the welcome dialog to show on startup"))
+parser.add_option("-n", "--no-project", action="store_true", dest="forceNoProject", 
+				help=_("Force Jokosher to load without a welcome dialog or project"))
+parser.add_option("-e", "--no-extensions", action="store_true", dest="noextensions", 
+				help=_("Do not load extensions on startup"))
+
+(options, args) = parser.parse_args()
+if len(args) > 0:
+	openproject = args[0]
+	
+Globals.DEBUG_STDOUT = options.debug
+Globals.DEBUG_GST = options.gstDebug
+
+if options.forceWelcome:
+	startupType = 2
+elif options.forceNoProject:
+	startupType = 1
+else:
+	startupType = None
+
+if options.safeMode:
+	loadExtensions = False
+	startupType = 1
+
+if options.noextensions:
+	loadExtensions = False
+
+#wait until after we parse the args to import JokosherApp
+#because it will import gst which replaces our "--help" message.
+localFileImport("JokosherApp")
+#Launching the program
+JokosherApp.MainApp(openproject, loadExtensions, startupType)
+JokosherApp.gobject.threads_init()
+JokosherApp.gtk.main()
